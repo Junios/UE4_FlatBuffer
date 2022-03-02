@@ -9,6 +9,11 @@
 #include "Sockets.h"
 #include "SocketSubsystem.h"
 
+#include "MsgId.h"
+#include "ProjectM_generated.h"
+
+#include <memory>
+#include <unordered_map>
 
 #include "SocketSampleCharacter.generated.h"
 
@@ -47,6 +52,10 @@ protected:
 	/** Called for side to side input */
 	void MoveRight(float Value);
 
+	bool Login(std::string token);
+
+	bool Move(int dx, int dy, int dz);
+
 	/** 
 	 * Called via input to turn at a given rate. 
 	 * @param Rate	This is a normalized rate, i.e. 1.0 means 100% of desired turn rate
@@ -67,6 +76,16 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	//virtual void Tick(float DeltaSeconds) override;
+
+
+	FSocket* Socket;
+
+	bool bConnected;
+
+
+	uint64_t _uid;
+	ProjectM::Actor::Transform _trans;
 
 protected:
 	// APawn interface

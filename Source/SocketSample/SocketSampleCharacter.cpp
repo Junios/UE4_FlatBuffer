@@ -8,9 +8,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "MsgId.h"
-#include "ProjectM_generated.h"
+
 #include "NetWorking/Public/Interfaces/IPv4/IPv4Address.h"
+
 
 
 
@@ -105,22 +105,31 @@ void ASocketSampleCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector
 
 void ASocketSampleCharacter::BeginPlay()
 {
-	FSocket* Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_Stream, TEXT("default"), false);
+	//Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_Stream, TEXT("default"), false);
 
-	FString address = TEXT("127.0.0.1");
-	int32 port = 9810;
-	FIPv4Address ip;
-	FIPv4Address::Parse(address, ip);
+	//FString address = TEXT("127.0.0.1");
+	//int32 port = 9810;
+	//FIPv4Address ip;
+	//FIPv4Address::Parse(address, ip);
 
-	TSharedRef<FInternetAddr> addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	addr->SetIp(ip.Value);
-	addr->SetPort(port);
+	//TSharedRef<FInternetAddr> addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
+	//addr->SetIp(ip.Value);
+	//addr->SetPort(port);
 
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Trying to connect.")));
+	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Trying to connect.")));
 
-	bool connected = Socket->Connect(*addr);
+	//bConnected = Socket->Connect(*addr);
+
+	//Login("a1");
 
 }
+//
+//void ASocketSampleCharacter::Tick(float DeltaSeconds)
+//{
+//	Super::Tick(DeltaSeconds);
+//
+//	//Move(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
+//}
 
 void ASocketSampleCharacter::TurnAtRate(float Rate)
 {
@@ -162,3 +171,99 @@ void ASocketSampleCharacter::MoveRight(float Value)
 		AddMovementInput(Direction, Value);
 	}
 }
+
+
+struct Actor
+{
+
+};
+
+class World
+{
+public:
+	std::unordered_map<uint64_t, Actor> _objMap;
+};
+
+
+bool ASocketSampleCharacter::Login(std::string token)
+{
+	bool r = false;
+
+	flatbuffers::FlatBufferBuilder fbb;
+	ProjectM::Actor::C2S_LoginT log;
+	log.token = token;
+	fbb.Finish(ProjectM::Actor::C2S_Login::Pack(fbb, &log));
+
+	uint32_t head = ((uint32_t)MsgId::C2S_Login << 16) | (4 + fbb.GetSize());
+	std::vector<uint8_t> buf(4 + fbb.GetSize());
+	memcpy(&buf[0], &head, sizeof(head));
+	memcpy(&buf[sizeof(head)], fbb.GetBufferPointer(), fbb.GetSize());
+	int32 sentByets = 0;
+	r =	 Socket->Send(buf.data(), buf.size(), sentByets);
+
+	assert(r);
+
+	return true;
+}
+
+bool ASocketSampleCharacter::Move(int dx, int dy, int dz)
+{
+	flatbuffers::FlatBufferBuilder fbb;
+	ProjectM::Actor::C2S_SyncLocationT loc;
+	loc.actor_id = _uid;
+	_trans.mutable_location().mutate_x(_trans.mutable_location().x() + (float)dx);
+	_trans.mutable_location().mutate_y(_trans.mutable_location().y() + (float)dy);
+	_trans.mutable_location().mutate_z(_trans.mutable_location().z() + (float)dz);
+	loc.transform = std::make_unique<ProjectM::Actor::Transform>(_trans);
+
+	fbb.Finish(ProjectM::Actor::C2S_SyncLocation::Pack(fbb, &loc));
+
+	uint32_t head = ((uint32_t)MsgId::C2S_SyncLocation << 16) | (4 + fbb.GetSize());
+	std::vector<uint8_t> buf(4 + fbb.GetSize());
+	memcpy(&buf[0], &head, sizeof(head));
+	memcpy(&buf[sizeof(head)], fbb.GetBufferPointer(), fbb.GetSize());
+	int32 sentByets = 0;
+	bool r = Socket->Send(buf.data(), buf.size(), sentByets);
+	assert(r);
+
+	return true;
+}
+
+//uint32_t head;
+//int len = CAsyncSocket::Receive(&head, sizeof(head));
+//if (len == SOCKET_ERROR)
+//{
+//	int e = WSAGetLastError();
+//	if (e == WSAEWOULDBLOCK) break;
+//}
+//assert(len == sizeof(head));
+//
+//MsgId id = (MsgId)HIWORD(head);
+//uint16_t sz = LOWORD(head) - 4;
+//
+//std::vector<uint8_t> body(sz + 10);
+//len = Receive(body.data(), sz);
+//assert(len == sz);
+//
+//if (id == MsgId::S2C_Login)
+//{
+//	const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(body.data());
+//	_uid = msg.actor_id();
+//}
+//
+//else if (id == MsgId::S2C_SpawnActors)
+//{
+//	const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(body.data());
+//}
+//
+//else if (id == MsgId::S2C_SyncLocation)
+//{
+//	const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(body.data());
+//	if (_uid != msg.actor_id())
+//	{
+//		Actor& act = _world._objMap[msg.actor_id()];
+//		act._uid = msg.actor_id();
+//		act._trans = *msg.transform();
+//		AfxGetMainWnd()->Invalidate(FALSE);
+//	}
+//}
