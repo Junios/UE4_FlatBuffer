@@ -78,7 +78,9 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 
-	uint64_t _uid = 0;
+	uint64_t ActorUID = 0;
+
+	float ElapsedTime = 0;
 
 };
 

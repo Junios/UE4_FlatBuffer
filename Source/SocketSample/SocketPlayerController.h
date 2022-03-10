@@ -63,4 +63,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Data", BlueprintReadWrite)
 	TSubclassOf<ASocketSampleCharacter> SpawnCharacterClass;
+
+	uint64 ActorUID = 0;
 };

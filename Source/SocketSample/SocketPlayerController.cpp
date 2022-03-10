@@ -13,6 +13,7 @@
 
 #include "SocketSampleCharacter.h"
 
+#include "GameFramework/CharacterMovementComponent.h"
 
 
 
@@ -110,7 +111,7 @@ bool ASocketPlayerController::Move()
 	{
 		flatbuffers::FlatBufferBuilder fbb;
 		ProjectM::Actor::C2S_SyncLocationT loc;
-		loc.actor_id = NetworkChracter->_uid;
+		loc.actor_id = NetworkChracter->ActorUID;
 
 		ProjectM::Actor::Transform _trans;
 		_trans.mutable_location().mutate_x(NetworkChracter->GetActorLocation().X);
@@ -174,26 +175,27 @@ void ASocketPlayerController::Recv()
 		//UE_LOG(LogTemp, Warning, TEXT("MesageSize %d"), sz);
 
 
-		ReceivedData.Init(0, FMath::Min((uint32)sz, 65507u));
+		ReceivedData.Init(0, FMath::Min((uint32)sz, 4096u));
 		Socket->Recv(ReceivedData.GetData(), sz, Read);
 
 
 		if (id == MsgId::S2C_Login)
 		{
 			const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(ReceivedData.GetData());
-			if (NetworkChracter->_uid == 0)
+			if (NetworkChracter->ActorUID == 0)
 			{
-				NetworkChracter->_uid = msg.actor_id();
-				UE_LOG(LogTemp, Warning, TEXT("set S2C_Login actor id %d"), NetworkChracter->_uid);
+				ActorUID = msg.actor_id();
+				NetworkChracter->ActorUID = msg.actor_id();
+				UE_LOG(LogTemp, Warning, TEXT("set S2C_Login actor id %d"), NetworkChracter->ActorUID);
 
 			}
 		}
 		else if (id == MsgId::S2C_SpawnActors)
 		{
-			if (NetworkChracter->_uid == 0)
-			{
-				continue;
-			}
+			//if (NetworkChracter->ActorUID == 0)
+			//{
+			//	continue;
+			//}
 
 			const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(ReceivedData.GetData());
 
@@ -209,8 +211,8 @@ void ASocketPlayerController::Recv()
 					ASocketSampleCharacter* SpawnedCharacter =  GetWorld()->SpawnActor<ASocketSampleCharacter>(SpawnCharacterClass, GetPawn()->GetActorTransform());
 					if (SpawnedCharacter)
 					{
-						UE_LOG(LogClass, Warning, TEXT("Spawn %d"), SpawnedCharacter->_uid);
-						SpawnedCharacter->_uid = (*ids)[i];
+						UE_LOG(LogClass, Warning, TEXT("Spawn %d"), SpawnedCharacter->ActorUID);
+						SpawnedCharacter->ActorUID = (*ids)[i];
 
 						const flatbuffers::Vector<const ProjectM::Actor::Transform*>* transforms = msg.transform();
 						const ProjectM::Actor::Transform* transform = (*transforms)[i];
@@ -221,6 +223,8 @@ void ASocketPlayerController::Recv()
 						NewTransform.SetScale3D(FVector(transform->scale().x(), transform->scale().y(), transform->scale().z()));
 
 						SpawnedCharacter->SetActorTransform(NewTransform);
+
+						SpawnedCharacter->GetCharacterMovement()->Activate(false);
 
 						//SetControlRotation(FRotator(transform->rotation().x(), transform->rotation().y(), transform->rotation().z()));
 
@@ -265,7 +269,7 @@ bool ASocketPlayerController::FindCharacterByUID(uint64 UID)
 		{
 			//UE_LOG(LogTemp, Warning, TEXT("FindCharacterByUID %d"), NetworkCharacter->_uid);
 
-			if (NetworkCharacter->_uid == UID)
+			if (NetworkCharacter->ActorUID == UID)
 			{
 				return true;
 			}
@@ -288,9 +292,14 @@ bool ASocketPlayerController::SyncTransform(const ProjectM::Actor::S2C_SyncLocat
 		ASocketSampleCharacter* NetworkCharacter = Cast<ASocketSampleCharacter>(SelectedCharacter);
 		if (NetworkCharacter != nullptr)
 		{
+			if (ActorUID == UID)
+			{
+				UE_LOG(LogClass, Warning, TEXT("Own Player %d"), UID);
+				continue;
+			}
 			//UE_LOG(LogTemp, Warning, TEXT("SyncTransform %d"), NetworkCharacter->_uid);
 
-			if (NetworkCharacter->_uid == UID)
+			if (NetworkCharacter->ActorUID == UID)
 			{
 				FTransform NewTransform;
 				NewTransform.SetLocation(FVector(transform.location().x(), transform.location().y(), transform.location().z()));
