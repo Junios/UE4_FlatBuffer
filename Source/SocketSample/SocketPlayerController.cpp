@@ -116,9 +116,9 @@ bool ASocketPlayerController::Move()
 		_trans.mutable_location().mutate_x(NetworkChracter->GetActorLocation().X);
 		_trans.mutable_location().mutate_y(NetworkChracter->GetActorLocation().Y);
 		_trans.mutable_location().mutate_z(NetworkChracter->GetActorLocation().Z);
-		_trans.mutable_rotation().mutate_x(GetControlRotation().Pitch);
-		_trans.mutable_rotation().mutate_y(GetControlRotation().Yaw);
-		_trans.mutable_rotation().mutate_z(GetControlRotation().Roll);
+		_trans.mutable_rotation().mutate_x(NetworkChracter->GetActorRotation().Pitch);
+		_trans.mutable_rotation().mutate_y(NetworkChracter->GetActorRotation().Yaw);
+		_trans.mutable_rotation().mutate_z(NetworkChracter->GetActorRotation().Roll);
 		_trans.mutable_scale().mutate_x(NetworkChracter->GetActorScale().X);
 		_trans.mutable_scale().mutate_y(NetworkChracter->GetActorScale().Y);
 		_trans.mutable_scale().mutate_z(NetworkChracter->GetActorScale().Z);
@@ -217,10 +217,13 @@ void ASocketPlayerController::Recv()
 
 						FTransform NewTransform;
 						NewTransform.SetLocation(FVector(transform->location().x(), transform->location().y(), transform->location().z()));
-						SetControlRotation(FRotator(transform->rotation().x(), transform->rotation().y(), transform->rotation().z()));
+						NewTransform.SetRotation(FRotator(transform->rotation().x(), transform->rotation().y(), transform->rotation().z()).Quaternion());
 						NewTransform.SetScale3D(FVector(transform->scale().x(), transform->scale().y(), transform->scale().z()));
 
 						SpawnedCharacter->SetActorTransform(NewTransform);
+
+						//SetControlRotation(FRotator(transform->rotation().x(), transform->rotation().y(), transform->rotation().z()));
+
 					}
 				}
 			}
@@ -240,15 +243,7 @@ void ASocketPlayerController::Recv()
 		return;
 	}
 
-	//UE_LOG(LogTemp, Warning, TEXT("Data Bytes Read ~> %d"), ReceivedData.Num());
-
-	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	//                      Rama's String From Binary Array
 	//const FString ReceivedUE4String = StringFromBinaryArray(ReceivedData);
-	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-	//UE_LOG(LogTemp, Warning, TEXT("As String Data ~> %s"), *ReceivedUE4String);
 }
 
 FString ASocketPlayerController::StringFromBinaryArray(const TArray<uint8>& BinaryArray)
@@ -299,11 +294,13 @@ bool ASocketPlayerController::SyncTransform(const ProjectM::Actor::S2C_SyncLocat
 			{
 				FTransform NewTransform;
 				NewTransform.SetLocation(FVector(transform.location().x(), transform.location().y(), transform.location().z()));
-				//SetControlRotation(FRotator(transform.rotation().x(), transform.rotation().y(), transform.rotation().z()));
+				NewTransform.SetRotation(FRotator(transform.rotation().x(), transform.rotation().y(), transform.rotation().z()).Quaternion());
 				NewTransform.SetScale3D(FVector(transform.scale().x(), transform.scale().y(), transform.scale().z()));
 
 
 				NetworkCharacter->SetActorTransform(NewTransform);
+
+				//SetControlRotation(FRotator(transform.rotation().x(), transform.rotation().y(), transform.rotation().z()));
 
 
 				return true;
