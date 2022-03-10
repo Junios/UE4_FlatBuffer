@@ -260,44 +260,54 @@ void ASocketSampleCharacter::Recv()
 
 	//Binary Array!
 	TArray<uint8> ReceivedData;
+	uint32_t Head = 0;
 
 	uint32 Size;
 	while (Socket->HasPendingData(Size))
 	{
-		ReceivedData.Init(0, FMath::Min(Size, 65507u));
+		//ReceivedData.Init(0, FMath::Min(Size, 65507u));
+
+		//int32 Read = 0;
+		//Socket->Recv(ReceivedData.GetData(), ReceivedData.Num(), Read);
+
 
 		int32 Read = 0;
-		Socket->Recv(ReceivedData.GetData(), ReceivedData.Num(), Read);
+		Socket->Recv((uint8*)&Head, 4, Read);
+
+		UE_LOG(LogTemp, Warning, TEXT("Header %d"), Read);
 
 		////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		//MsgId id = (MsgId)HIWORD(head);
-		//uint16_t sz = LOWORD(head) - 4;
+		MsgId id = (MsgId)HIWORD(Head);
+		uint16 sz = LOWORD(Head) - 4;
 
-		//std::vector<uint8_t> body(sz + 10);
-		//len = Receive(body.data(), sz);
-		//assert(len == sz);
+		UE_LOG(LogTemp, Warning, TEXT("MesageSize %d"), sz);
 
-		//if (id == MsgId::S2C_Login)
-		//{
-		//	const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(body.data());
-		//	_uid = msg.actor_id();
-		//}
 
-		//else if (id == MsgId::S2C_SpawnActors)
-		//{
-		//	const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(body.data());
-		//}
+		ReceivedData.Init(0, FMath::Min((uint32)sz, 65507u));
+		Socket->Recv(ReceivedData.GetData(), sz, Read);
 
-		//else if (id == MsgId::S2C_SyncLocation)
-		//{
-		//	const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(body.data());
-		//	if (_uid != msg.actor_id())
-		//	{
-		//		Actor& act = _world._objMap[msg.actor_id()];
-		//		act._uid = msg.actor_id();
-		//		act._trans = *msg.transform();
-		//	}
-		//}
+
+		if (id == MsgId::S2C_Login)
+		{
+			const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(ReceivedData.GetData());
+			_uid = msg.actor_id();
+		}
+		else if (id == MsgId::S2C_SpawnActors)
+		{
+			const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(ReceivedData.GetData());
+		}
+		else if (id == MsgId::S2C_SyncLocation)
+		{
+			const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(ReceivedData.GetData());
+			UE_LOG(LogTemp, Warning, TEXT("S2C_SyncLocation"));
+
+			if (_uid != msg.actor_id())
+			{
+				//Actor& act = _world._objMap[msg.actor_id()];
+				//act._uid = msg.actor_id();
+				//act._trans = *msg.transform();
+			}
+		}
 		//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	}
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
