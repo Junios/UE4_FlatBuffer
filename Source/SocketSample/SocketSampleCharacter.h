@@ -52,9 +52,6 @@ protected:
 	/** Called for side to side input */
 	void MoveRight(float Value);
 
-	bool Login(std::string token);
-
-	bool Move(int dx, int dy, int dz);
 
 	/** 
 	 * Called via input to turn at a given rate. 
@@ -76,13 +73,24 @@ protected:
 
 	virtual void BeginPlay() override;
 
-	//virtual void Tick(float DeltaSeconds) override;
+	virtual void Tick(float DeltaSeconds) override;
 
+
+	bool Login(std::string token);
+
+	bool Move();
+
+
+	void Recv();
+
+	FString StringFromBinaryArray(const TArray<uint8>& BinaryArray);
+
+
+	FTimerHandle RecvTimer;
 
 	FSocket* Socket;
 
 	bool bConnected;
-
 
 	uint64_t _uid;
 	ProjectM::Actor::Transform _trans;

@@ -10,6 +10,7 @@
 #include "GameFramework/SpringArmComponent.h"
 
 #include "NetWorking/Public/Interfaces/IPv4/IPv4Address.h"
+#include "TimerManager.h"
 
 
 
@@ -95,41 +96,45 @@ void ASocketSampleCharacter::OnResetVR()
 
 void ASocketSampleCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
-		Jump();
+	Jump();
 }
 
 void ASocketSampleCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector Location)
 {
-		StopJumping();
+	StopJumping();
 }
 
 void ASocketSampleCharacter::BeginPlay()
 {
-	//Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_Stream, TEXT("default"), false);
+	Super::BeginPlay();
+	Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_Stream, TEXT("default"), false);
 
-	//FString address = TEXT("127.0.0.1");
-	//int32 port = 9810;
-	//FIPv4Address ip;
-	//FIPv4Address::Parse(address, ip);
+	FString address = TEXT("127.0.0.1");
+	int32 port = 9810;
+	FIPv4Address ip;
+	FIPv4Address::Parse(address, ip);
 
-	//TSharedRef<FInternetAddr> addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	//addr->SetIp(ip.Value);
-	//addr->SetPort(port);
+	TSharedRef<FInternetAddr> addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
+	addr->SetIp(ip.Value);
+	addr->SetPort(port);
 
-	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Trying to connect.")));
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Trying to connect.")));
 
-	//bConnected = Socket->Connect(*addr);
+	bConnected = Socket->Connect(*addr);
 
-	//Login("a1");
-
+	if (bConnected)
+	{
+		GetWorldTimerManager().SetTimer(RecvTimer, this, &ASocketSampleCharacter::Recv, 0.01, true);
+		Login("a1");
+	}
 }
-//
-//void ASocketSampleCharacter::Tick(float DeltaSeconds)
-//{
-//	Super::Tick(DeltaSeconds);
-//
-//	//Move(GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
-//}
+
+void ASocketSampleCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	Move();
+}
 
 void ASocketSampleCharacter::TurnAtRate(float Rate)
 {
@@ -159,12 +164,12 @@ void ASocketSampleCharacter::MoveForward(float Value)
 
 void ASocketSampleCharacter::MoveRight(float Value)
 {
-	if ( (Controller != nullptr) && (Value != 0.0f) )
+	if ((Controller != nullptr) && (Value != 0.0f))
 	{
 		// find out which way is right
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
-	
+
 		// get right vector 
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
@@ -199,21 +204,27 @@ bool ASocketSampleCharacter::Login(std::string token)
 	memcpy(&buf[0], &head, sizeof(head));
 	memcpy(&buf[sizeof(head)], fbb.GetBufferPointer(), fbb.GetSize());
 	int32 sentByets = 0;
-	r =	 Socket->Send(buf.data(), buf.size(), sentByets);
+	r = Socket->Send(buf.data(), buf.size(), sentByets);
 
 	assert(r);
 
 	return true;
 }
 
-bool ASocketSampleCharacter::Move(int dx, int dy, int dz)
+bool ASocketSampleCharacter::Move()
 {
 	flatbuffers::FlatBufferBuilder fbb;
 	ProjectM::Actor::C2S_SyncLocationT loc;
 	loc.actor_id = _uid;
-	_trans.mutable_location().mutate_x(_trans.mutable_location().x() + (float)dx);
-	_trans.mutable_location().mutate_y(_trans.mutable_location().y() + (float)dy);
-	_trans.mutable_location().mutate_z(_trans.mutable_location().z() + (float)dz);
+	_trans.mutable_location().mutate_x(GetActorLocation().X);
+	_trans.mutable_location().mutate_y(GetActorLocation().Y);
+	_trans.mutable_location().mutate_z(GetActorLocation().Z);
+	_trans.mutable_rotation().mutate_x(GetControlRotation().Pitch);
+	_trans.mutable_rotation().mutate_y(GetControlRotation().Yaw);
+	_trans.mutable_rotation().mutate_z(GetControlRotation().Roll);
+	_trans.mutable_scale().mutate_x(GetActorScale().X);
+	_trans.mutable_scale().mutate_y(GetActorScale().Y);
+	_trans.mutable_scale().mutate_z(GetActorScale().Z);
 	loc.transform = std::make_unique<ProjectM::Actor::Transform>(_trans);
 
 	fbb.Finish(ProjectM::Actor::C2S_SyncLocation::Pack(fbb, &loc));
@@ -238,32 +249,79 @@ bool ASocketSampleCharacter::Move(int dx, int dy, int dz)
 //}
 //assert(len == sizeof(head));
 //
-//MsgId id = (MsgId)HIWORD(head);
-//uint16_t sz = LOWORD(head) - 4;
-//
-//std::vector<uint8_t> body(sz + 10);
-//len = Receive(body.data(), sz);
-//assert(len == sz);
-//
-//if (id == MsgId::S2C_Login)
-//{
-//	const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(body.data());
-//	_uid = msg.actor_id();
-//}
-//
-//else if (id == MsgId::S2C_SpawnActors)
-//{
-//	const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(body.data());
-//}
-//
-//else if (id == MsgId::S2C_SyncLocation)
-//{
-//	const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(body.data());
-//	if (_uid != msg.actor_id())
-//	{
-//		Actor& act = _world._objMap[msg.actor_id()];
-//		act._uid = msg.actor_id();
-//		act._trans = *msg.transform();
-//		AfxGetMainWnd()->Invalidate(FALSE);
-//	}
-//}
+
+
+void ASocketSampleCharacter::Recv()
+{
+	//~~~~~~~~~~~~~
+	if (!bConnected) return;
+	//~~~~~~~~~~~~~
+
+
+	//Binary Array!
+	TArray<uint8> ReceivedData;
+
+	uint32 Size;
+	while (Socket->HasPendingData(Size))
+	{
+		ReceivedData.Init(0, FMath::Min(Size, 65507u));
+
+		int32 Read = 0;
+		Socket->Recv(ReceivedData.GetData(), ReceivedData.Num(), Read);
+
+		////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+		//MsgId id = (MsgId)HIWORD(head);
+		//uint16_t sz = LOWORD(head) - 4;
+
+		//std::vector<uint8_t> body(sz + 10);
+		//len = Receive(body.data(), sz);
+		//assert(len == sz);
+
+		//if (id == MsgId::S2C_Login)
+		//{
+		//	const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(body.data());
+		//	_uid = msg.actor_id();
+		//}
+
+		//else if (id == MsgId::S2C_SpawnActors)
+		//{
+		//	const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(body.data());
+		//}
+
+		//else if (id == MsgId::S2C_SyncLocation)
+		//{
+		//	const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(body.data());
+		//	if (_uid != msg.actor_id())
+		//	{
+		//		Actor& act = _world._objMap[msg.actor_id()];
+		//		act._uid = msg.actor_id();
+		//		act._trans = *msg.transform();
+		//	}
+		//}
+		//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	}
+	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+	if (ReceivedData.Num() <= 0)
+	{
+		//No Data Received
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Data Bytes Read ~> %d"), ReceivedData.Num());
+
+	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	//                      Rama's String From Binary Array
+	const FString ReceivedUE4String = StringFromBinaryArray(ReceivedData);
+	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+	UE_LOG(LogTemp, Warning, TEXT("As String Data ~> %s"), *ReceivedUE4String);
+}
+
+FString ASocketSampleCharacter::StringFromBinaryArray(const TArray<uint8>& BinaryArray)
+{
+	//Create a string from a byte array!
+	std::string cstr(reinterpret_cast<const char*>(BinaryArray.GetData()), BinaryArray.Num());
+	return FString(cstr.c_str());
+}
