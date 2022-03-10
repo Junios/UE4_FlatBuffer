@@ -8,9 +8,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "SocketPlayerController.h"
 
-#include "NetWorking/Public/Interfaces/IPv4/IPv4Address.h"
-#include "TimerManager.h"
+
 
 
 
@@ -104,36 +104,16 @@ void ASocketSampleCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector
 	StopJumping();
 }
 
-void ASocketSampleCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-	Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_Stream, TEXT("default"), false);
-
-	FString address = TEXT("127.0.0.1");
-	int32 port = 9810;
-	FIPv4Address ip;
-	FIPv4Address::Parse(address, ip);
-
-	TSharedRef<FInternetAddr> addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	addr->SetIp(ip.Value);
-	addr->SetPort(port);
-
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Trying to connect.")));
-
-	bConnected = Socket->Connect(*addr);
-
-	if (bConnected)
-	{
-		GetWorldTimerManager().SetTimer(RecvTimer, this, &ASocketSampleCharacter::Recv, 0.01, true);
-		Login("a1");
-	}
-}
 
 void ASocketSampleCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	Move();
+	ASocketPlayerController* PC = Cast<ASocketPlayerController>(GetController());
+	if (PC)
+	{
+		PC->Move();
+	}
 }
 
 void ASocketSampleCharacter::TurnAtRate(float Rate)
@@ -177,161 +157,3 @@ void ASocketSampleCharacter::MoveRight(float Value)
 	}
 }
 
-
-struct Actor
-{
-
-};
-
-class World
-{
-public:
-	std::unordered_map<uint64_t, Actor> _objMap;
-};
-
-
-bool ASocketSampleCharacter::Login(std::string token)
-{
-	bool r = false;
-
-	flatbuffers::FlatBufferBuilder fbb;
-	ProjectM::Actor::C2S_LoginT log;
-	log.token = token;
-	fbb.Finish(ProjectM::Actor::C2S_Login::Pack(fbb, &log));
-
-	uint32_t head = ((uint32_t)MsgId::C2S_Login << 16) | (4 + fbb.GetSize());
-	std::vector<uint8_t> buf(4 + fbb.GetSize());
-	memcpy(&buf[0], &head, sizeof(head));
-	memcpy(&buf[sizeof(head)], fbb.GetBufferPointer(), fbb.GetSize());
-	int32 sentByets = 0;
-	r = Socket->Send(buf.data(), buf.size(), sentByets);
-
-	assert(r);
-
-	return true;
-}
-
-bool ASocketSampleCharacter::Move()
-{
-	flatbuffers::FlatBufferBuilder fbb;
-	ProjectM::Actor::C2S_SyncLocationT loc;
-	loc.actor_id = _uid;
-	_trans.mutable_location().mutate_x(GetActorLocation().X);
-	_trans.mutable_location().mutate_y(GetActorLocation().Y);
-	_trans.mutable_location().mutate_z(GetActorLocation().Z);
-	_trans.mutable_rotation().mutate_x(GetControlRotation().Pitch);
-	_trans.mutable_rotation().mutate_y(GetControlRotation().Yaw);
-	_trans.mutable_rotation().mutate_z(GetControlRotation().Roll);
-	_trans.mutable_scale().mutate_x(GetActorScale().X);
-	_trans.mutable_scale().mutate_y(GetActorScale().Y);
-	_trans.mutable_scale().mutate_z(GetActorScale().Z);
-	loc.transform = std::make_unique<ProjectM::Actor::Transform>(_trans);
-
-	fbb.Finish(ProjectM::Actor::C2S_SyncLocation::Pack(fbb, &loc));
-
-	uint32_t head = ((uint32_t)MsgId::C2S_SyncLocation << 16) | (4 + fbb.GetSize());
-	std::vector<uint8_t> buf(4 + fbb.GetSize());
-	memcpy(&buf[0], &head, sizeof(head));
-	memcpy(&buf[sizeof(head)], fbb.GetBufferPointer(), fbb.GetSize());
-	int32 sentByets = 0;
-	bool r = Socket->Send(buf.data(), buf.size(), sentByets);
-	assert(r);
-
-	return true;
-}
-
-//uint32_t head;
-//int len = CAsyncSocket::Receive(&head, sizeof(head));
-//if (len == SOCKET_ERROR)
-//{
-//	int e = WSAGetLastError();
-//	if (e == WSAEWOULDBLOCK) break;
-//}
-//assert(len == sizeof(head));
-//
-
-
-void ASocketSampleCharacter::Recv()
-{
-	//~~~~~~~~~~~~~
-	if (!bConnected) return;
-	//~~~~~~~~~~~~~
-
-
-	//Binary Array!
-	TArray<uint8> ReceivedData;
-	uint32_t Head = 0;
-
-	uint32 Size;
-	while (Socket->HasPendingData(Size))
-	{
-		//ReceivedData.Init(0, FMath::Min(Size, 65507u));
-
-		//int32 Read = 0;
-		//Socket->Recv(ReceivedData.GetData(), ReceivedData.Num(), Read);
-
-
-		int32 Read = 0;
-		Socket->Recv((uint8*)&Head, 4, Read);
-
-		UE_LOG(LogTemp, Warning, TEXT("Header %d"), Read);
-
-		////~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		MsgId id = (MsgId)HIWORD(Head);
-		uint16 sz = LOWORD(Head) - 4;
-
-		UE_LOG(LogTemp, Warning, TEXT("MesageSize %d"), sz);
-
-
-		ReceivedData.Init(0, FMath::Min((uint32)sz, 65507u));
-		Socket->Recv(ReceivedData.GetData(), sz, Read);
-
-
-		if (id == MsgId::S2C_Login)
-		{
-			const ProjectM::Actor::S2C_Login& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_Login>(ReceivedData.GetData());
-			_uid = msg.actor_id();
-		}
-		else if (id == MsgId::S2C_SpawnActors)
-		{
-			const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(ReceivedData.GetData());
-		}
-		else if (id == MsgId::S2C_SyncLocation)
-		{
-			const ProjectM::Actor::S2C_SyncLocation& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SyncLocation>(ReceivedData.GetData());
-			UE_LOG(LogTemp, Warning, TEXT("S2C_SyncLocation"));
-
-			if (_uid != msg.actor_id())
-			{
-				//Actor& act = _world._objMap[msg.actor_id()];
-				//act._uid = msg.actor_id();
-				//act._trans = *msg.transform();
-			}
-		}
-		//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	}
-	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-	if (ReceivedData.Num() <= 0)
-	{
-		//No Data Received
-		return;
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("Data Bytes Read ~> %d"), ReceivedData.Num());
-
-	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	//                      Rama's String From Binary Array
-	const FString ReceivedUE4String = StringFromBinaryArray(ReceivedData);
-	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-	UE_LOG(LogTemp, Warning, TEXT("As String Data ~> %s"), *ReceivedUE4String);
-}
-
-FString ASocketSampleCharacter::StringFromBinaryArray(const TArray<uint8>& BinaryArray)
-{
-	//Create a string from a byte array!
-	std::string cstr(reinterpret_cast<const char*>(BinaryArray.GetData()), BinaryArray.Num());
-	return FString(cstr.c_str());
-}

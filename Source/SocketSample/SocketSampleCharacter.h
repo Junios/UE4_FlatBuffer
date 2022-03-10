@@ -5,15 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 
-#include "Networking.h"
-#include "Sockets.h"
-#include "SocketSubsystem.h"
 
-#include "MsgId.h"
-#include "ProjectM_generated.h"
-
-#include <memory>
-#include <unordered_map>
 
 #include "SocketSampleCharacter.generated.h"
 
@@ -71,29 +63,8 @@ protected:
 	/** Handler for when a touch input stops. */
 	void TouchStopped(ETouchIndex::Type FingerIndex, FVector Location);
 
-	virtual void BeginPlay() override;
-
 	virtual void Tick(float DeltaSeconds) override;
 
-
-	bool Login(std::string token);
-
-	bool Move();
-
-
-	void Recv();
-
-	FString StringFromBinaryArray(const TArray<uint8>& BinaryArray);
-
-
-	FTimerHandle RecvTimer;
-
-	FSocket* Socket;
-
-	bool bConnected;
-
-	uint64_t _uid;
-	ProjectM::Actor::Transform _trans;
 
 protected:
 	// APawn interface
@@ -105,5 +76,9 @@ public:
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+
+	uint64_t _uid = 0;
+
 };
 
