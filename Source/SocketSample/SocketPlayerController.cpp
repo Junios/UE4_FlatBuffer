@@ -199,35 +199,30 @@ void ASocketPlayerController::Recv()
 
 			const flatbuffers::Vector<uint64_t>* ids = msg.actor_id();
 
-			for (auto actorID : *ids)
+			for (size_t i = 0; i < ids->Length(); ++i)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %d"), actorID);
+				
+				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %d"), (*ids)[i]);
 				//New Player
-				if (!FindCharacterByUID(actorID))
+				if (!FindCharacterByUID((*ids)[i]))
 				{
 					ASocketSampleCharacter* SpawnedCharacter =  GetWorld()->SpawnActor<ASocketSampleCharacter>(SpawnCharacterClass, GetPawn()->GetActorTransform());
 					if (SpawnedCharacter)
 					{
 						UE_LOG(LogClass, Warning, TEXT("Spawn %d"), SpawnedCharacter->_uid);
-						SpawnedCharacter->_uid = actorID;
+						SpawnedCharacter->_uid = (*ids)[i];
+
+						const flatbuffers::Vector<const ProjectM::Actor::Transform*>* transforms = msg.transform();
+						const ProjectM::Actor::Transform* transform = (*transforms)[i];
+
+						FTransform NewTransform;
+						NewTransform.SetLocation(FVector(transform->location().x(), transform->location().y(), transform->location().z()));
+						SetControlRotation(FRotator(transform->rotation().x(), transform->rotation().y(), transform->rotation().z()));
+						NewTransform.SetScale3D(FVector(transform->scale().x(), transform->scale().y(), transform->scale().z()));
+
+						SpawnedCharacter->SetActorTransform(NewTransform);
 					}
 				}
-			}
-
-			const flatbuffers::Vector<const ProjectM::Actor::Transform*>* transforms = msg.transform();
-
-			for (auto transform : *transforms)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->location().x());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->location().y());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->location().z());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->rotation().x());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->rotation().y());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->rotation().z());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->scale().x());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->scale().y());
-				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %f"), transform->scale().z());
-
 			}
 		}
 		else if (id == MsgId::S2C_SyncLocation)
@@ -273,7 +268,7 @@ bool ASocketPlayerController::FindCharacterByUID(uint64 UID)
 		ASocketSampleCharacter* NetworkCharacter = Cast<ASocketSampleCharacter>(SelectedCharacter);
 		if (NetworkCharacter != nullptr)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("FindCharacterByUID %d"), NetworkCharacter->_uid);
+			//UE_LOG(LogTemp, Warning, TEXT("FindCharacterByUID %d"), NetworkCharacter->_uid);
 
 			if (NetworkCharacter->_uid == UID)
 			{
@@ -298,13 +293,13 @@ bool ASocketPlayerController::SyncTransform(const ProjectM::Actor::S2C_SyncLocat
 		ASocketSampleCharacter* NetworkCharacter = Cast<ASocketSampleCharacter>(SelectedCharacter);
 		if (NetworkCharacter != nullptr)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("FindCharacterByUID %d"), NetworkCharacter->_uid);
+			//UE_LOG(LogTemp, Warning, TEXT("SyncTransform %d"), NetworkCharacter->_uid);
 
 			if (NetworkCharacter->_uid == UID)
 			{
 				FTransform NewTransform;
 				NewTransform.SetLocation(FVector(transform.location().x(), transform.location().y(), transform.location().z()));
-				SetControlRotation(FRotator(transform.rotation().x(), transform.rotation().y(), transform.rotation().z()));
+				//SetControlRotation(FRotator(transform.rotation().x(), transform.rotation().y(), transform.rotation().z()));
 				NewTransform.SetScale3D(FVector(transform.scale().x(), transform.scale().y(), transform.scale().z()));
 
 
