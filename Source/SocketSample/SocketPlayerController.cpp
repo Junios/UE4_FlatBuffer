@@ -192,18 +192,12 @@ void ASocketPlayerController::Recv()
 		}
 		else if (id == MsgId::S2C_SpawnActors)
 		{
-			//if (NetworkChracter->ActorUID == 0)
-			//{
-			//	continue;
-			//}
-
 			const ProjectM::Actor::S2C_SpawnActors& msg = *flatbuffers::GetRoot<ProjectM::Actor::S2C_SpawnActors>(ReceivedData.GetData());
 
 			const flatbuffers::Vector<uint64_t>* ids = msg.actor_id();
 
 			for (size_t i = 0; i < ids->Length(); ++i)
 			{
-				
 				UE_LOG(LogTemp, Warning, TEXT("S2C_SpawnActors %d"), (*ids)[i]);
 				//New Player
 				if (!FindCharacterByUID((*ids)[i]))
@@ -294,7 +288,6 @@ bool ASocketPlayerController::SyncTransform(const ProjectM::Actor::S2C_SyncLocat
 		{
 			if (ActorUID == UID)
 			{
-				UE_LOG(LogClass, Warning, TEXT("Own Player %d"), UID);
 				continue;
 			}
 			//UE_LOG(LogTemp, Warning, TEXT("SyncTransform %d"), NetworkCharacter->_uid);

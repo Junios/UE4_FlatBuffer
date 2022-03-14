@@ -112,7 +112,7 @@ void ASocketSampleCharacter::Tick(float DeltaSeconds)
 	ElapsedTime += DeltaSeconds;
 
 	ASocketPlayerController* PC = Cast<ASocketPlayerController>(GetController());
-	if (PC && ElapsedTime >= 0.1)
+	if (PC && ElapsedTime >= 0.05)
 	{
 		ElapsedTime = 0;
 		PC->Move();
